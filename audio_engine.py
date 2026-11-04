@@ -1,5 +1,7 @@
 import time
 import threading
+from collections import deque
+
 import numpy as np
 import pyaudiowpatch as pyaudio
 
@@ -17,8 +19,22 @@ class AudioAnalyzer:
         self.mids = 0.0
         self.treble = 0.0
 
-        self.smooth_factor = 0.2
+        self.num_bands = 64
+        self.bands = np.zeros(self.num_bands, dtype=np.float32)
+        
+        # Cria uma escala logarítmica de 20Hz a 12000Hz dividida em 20 partes
+        min_f, max_f = 20.0, 12000.0
+        self.band_limits = np.logspace(np.log10(min_f), np.log10(max_f), num=self.num_bands + 1)
+
+        self.smooth_factor = 0.12
         self.gain = 1.0
+
+        # ---- Detecção de Batida ----
+        self.beat = 0.0                     
+        self.beat_threshold = 1.45          
+        self._beat_cooldown = 0.30          
+        self._last_beat_time = 0.0
+        self._energy_history = deque(maxlen=60)  
 
         self._pa = None
         self.stream = None
@@ -34,13 +50,14 @@ class AudioAnalyzer:
             self._last_data_time = time.time()
         return (None, pyaudio.paContinue)
 
-    def _normalize_fft(self, value, min_val=1e-5):
+    def _normalize_fft(self, value, min_val=1e-7):
         db = 20 * np.log10(value + min_val)
-        normalized = np.clip((db + 60) / 60.0, 0.0, 1.0)
+        # Mapeia uma escala dinâmica de -50dB a 0dB para 0.0 a 1.0
+        # Isso garante que a barra dance no ritmo e caia quando o som baixar
+        normalized = np.clip((db + 50) / 50.0, 0.0, 1.0)
         return np.clip(normalized * self.gain, 0.0, 1.0)
 
     def _scan_devices(self):
-        """Lista os dispositivos de loopback WASAPI (o que está tocando nos alto-falantes)."""
         if self._pa is None:
             self._pa = pyaudio.PyAudio()
         self.available_devices = []
@@ -74,7 +91,6 @@ class AudioAnalyzer:
         if dev is None:
             raise RuntimeError("Dispositivo inválido.")
 
-        # Usa os valores nativos do dispositivo (o WASAPI shared exige isso)
         self._channels = dev['channels']
         self.sample_rate = dev['rate']
         self.buffer_size = 2048
@@ -98,15 +114,21 @@ class AudioAnalyzer:
             safe_buffer = self._latest_buffer.copy()
             age = time.time() - self._last_data_time
 
-        # O loopback para de enviar dados quando nada está tocando
+        now = time.time()
+
         if age > 0.2 or np.all(safe_buffer == 0):
             self.bass += (0.0 - self.bass) * self.smooth_factor
             self.mids += (0.0 - self.mids) * self.smooth_factor
             self.treble += (0.0 - self.treble) * self.smooth_factor
+            self.bands += (0.0 - self.bands) * self.smooth_factor
+            self.beat *= 0.95
             return
 
         windowed = safe_buffer * np.hanning(len(safe_buffer))
-        fft_data = np.abs(np.fft.rfft(windowed))
+        
+        # CORREÇÃO 1: Multiplica por 2 e divide pelo tamanho do buffer para normalizar o sinal, 
+        # impedindo que os valores estorem e as barras fiquem presas no topo.
+        fft_data = np.abs(np.fft.rfft(windowed)) * 2.0 / len(windowed)
         freqs = np.fft.rfftfreq(len(windowed), 1.0 / self.sample_rate)
 
         bass_mask = (freqs >= 20) & (freqs <= 250)
@@ -116,6 +138,46 @@ class AudioAnalyzer:
         raw_bass = np.mean(fft_data[bass_mask]) if np.any(bass_mask) else 0.0
         raw_mids = np.mean(fft_data[mids_mask]) if np.any(mids_mask) else 0.0
         raw_treble = np.mean(fft_data[treble_mask]) if np.any(treble_mask) else 0.0
+        
+        # Processamento das 20 bandas
+        for i in range(self.num_bands):
+            low_f = self.band_limits[i]
+            high_f = self.band_limits[i+1]
+            mask = (freqs >= low_f) & (freqs < high_f)
+            
+            if np.any(mask):
+                val = np.mean(fft_data[mask])
+            else:
+                # CORREÇÃO 2: Se a banda matemática for muito fina e não capturar nenhuma 
+                # frequência (gerando o buraco/barra vazia), pega a frequência mais próxima possível.
+                center_f = (low_f + high_f) / 2.0
+                idx = np.argmin(np.abs(freqs - center_f))
+                val = fft_data[idx]
+                
+            norm_val = self._normalize_fft(val)
+            self.bands[i] += (norm_val - self.bands[i]) * self.smooth_factor
+
+        # ================= DETECÇÃO DE BATIDA =================
+        self._energy_history.append(raw_bass)
+        self.beat *= 0.95  
+
+        if len(self._energy_history) >= 10:
+            history = np.array(self._energy_history)
+            local_mean = np.mean(history)
+            local_var = np.var(history)
+
+            rel_var = local_var / (local_mean ** 2 + 1e-12)
+            threshold = self.beat_threshold * (1.0 + 0.05 * min(rel_var, 2.0))
+
+            kick = (
+                raw_bass > local_mean * threshold   
+                and local_mean > 1e-5               
+                and (now - self._last_beat_time) > self._beat_cooldown
+            )
+            if kick:
+                self.beat = 1.0
+                self._last_beat_time = now
+        # =======================================================
 
         self.bass += (self._normalize_fft(raw_bass) - self.bass) * self.smooth_factor
         self.mids += (self._normalize_fft(raw_mids) - self.mids) * self.smooth_factor

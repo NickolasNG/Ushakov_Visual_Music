@@ -1,5 +1,5 @@
 # ==========================================
-# Ambientes Virtuais (NUNCA enviar para o GitHub)
+# Ambientes Virtuais
 # ==========================================
 venv/
 env/
@@ -20,7 +20,7 @@ build/
 *.egg
 
 # ==========================================
-# IDE (Visual Studio Code / PyCharm)
+# IDE
 # ==========================================
 .vscode/
 .idea/
@@ -29,8 +29,6 @@ build/
 *.sublime-project
 *.sublime-workspace
 
-# ==========================================
-# Arquivos do Sistema Operacional
 # ==========================================
 Thumbs.db
 .DS_Store
