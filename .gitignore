@@ -1,0 +1,42 @@
+# ==========================================
+# Ambientes Virtuais (NUNCA enviar para o GitHub)
+# ==========================================
+venv/
+env/
+.venv/
+ENV/
+
+# ==========================================
+# Python
+# ==========================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+
+# ==========================================
+# IDE (Visual Studio Code / PyCharm)
+# ==========================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*.sublime-project
+*.sublime-workspace
+
+# ==========================================
+# Arquivos do Sistema Operacional
+# ==========================================
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# ==========================================
+# Variáveis de Ambiente (Segurança)
+# ==========================================
+.env

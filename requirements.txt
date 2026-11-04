@@ -1,0 +1,5 @@
+PyAudioWPatch>=0.2.12.9
+numpy>=1.24.0
+ModernGL>=5.8.0
+glfw>=2.6.0
+imgui-bundle>=1.2.0
