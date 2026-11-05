@@ -30,11 +30,14 @@ build/
 *.sublime-workspace
 
 # ==========================================
-Thumbs.db
-.DS_Store
-desktop.ini
+# PyInstaller (Arquivos do Executável)
+# ==========================================
+*.manifest
+*.spec
 
 # ==========================================
-# Variáveis de Ambiente (Segurança)
+# Arquivos de Configuração Local (Opcional)
 # ==========================================
-.env
+# Se não quiser subir suas configurações pessoais salvas para o GitHub,
+# descomente a linha abaixo:
+# config.json

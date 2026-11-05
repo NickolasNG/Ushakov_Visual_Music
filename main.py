@@ -108,16 +108,21 @@ def main():
     vao_eye = ctx.simple_vertex_array(prog_eye, vbo, 'in_position')
 
     tex_eye = None
+    img_size = (1, 1)
     base_dir = os.path.dirname(os.path.abspath(__file__))
     image_path = os.path.join(base_dir, "olhos_base_anime.png")
     
     if os.path.exists(image_path):
         try:
             img = Image.open(image_path).transpose(Image.FLIP_TOP_BOTTOM).convert("RGB")
+            img_size = img.size
             tex_eye = ctx.texture(img.size, 3, img.tobytes())
             tex_eye.filter = (moderngl.LINEAR, moderngl.LINEAR)
+            print(f"✅ Imagem '{image_path}' carregada com sucesso!")
         except Exception as e:
-            print(f"Erro ao carregar a imagem: {e}")
+            print(f"❌ Erro ao carregar a imagem: {e}")
+    else:
+        print(f"⚠️ Imagem '{image_path}' não encontrada na pasta!")
 
     theme_names = ["Viagem Cosmica (Nebulosa)", "Equalizador Neon (64 Barras)", "Olho Anime + Barras Circulares"]
     
@@ -188,11 +193,32 @@ def main():
         if 'u_travel' in active_prog: active_prog['u_travel'] = travel
         if 'u_bands' in active_prog: active_prog['u_bands'].value = tuple(float(x) for x in audio.bands)
 
+        # Envia parâmetros específicos para o Tema do Olho
         if current_theme_idx == 2:
             if 'u_mask_center' in active_prog: active_prog['u_mask_center'].value = (mask_center_x, mask_center_y)
             if 'u_mask_radius' in active_prog: active_prog['u_mask_radius'].value = mask_radius
             if 'u_tex' in active_prog: active_prog['u_tex'].value = 0
-            if tex_eye: tex_eye.use(0)
+            
+            if tex_eye and 'u_img_aspect' in active_prog:
+                active_prog['u_img_aspect'].value = float(img_size[0]) / float(img_size[1])
+                
+            # Configurações padrão de estilo e cores dinâmicas para o shader do olho
+            uniforms_default = {
+                'u_col_a': (0.1, 0.4, 0.9),
+                'u_col_b': (1.0, 0.2, 0.6),
+                'u_rainbow': 0.0,
+                'u_img_tint': 1.0,
+                'u_bar_len': 1.0,
+                'u_bar_width': 1.0,
+                'u_glow': 1.0,
+                'u_chroma': 1.0
+            }
+            for u_name, u_val in uniforms_default.items():
+                if u_name in active_prog:
+                    active_prog[u_name].value = u_val
+
+            if tex_eye: 
+                tex_eye.use(0)
 
         ctx.clear(0.0, 0.0, 0.0, 1.0)
         active_vao.render(moderngl.TRIANGLE_STRIP)
