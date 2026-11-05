@@ -1,0 +1,11 @@
+{
+    "theme_idx": 1,
+    "gain": 1.8,
+    "smooth_factor": 0.18,
+    "beat_threshold": 1.4500000476837158,
+    "base_speed": 2.0,
+    "kick_boost": 10.0,
+    "mask_x": 0.05,
+    "mask_y": 0.05,
+    "mask_radius": 0.65
+}
