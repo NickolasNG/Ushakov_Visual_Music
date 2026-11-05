@@ -205,10 +205,6 @@ void main() {
         }
     }
 
-    vec3 mid_col = vec3(0.8, 0.2, 0.5);
-    float sw_r = r0 + (1.0 - u_beat) * (max_len + 0.2);
-    bars += mid_col * exp(-abs(d - sw_r) * 70.0) * u_beat * u_beat * 0.5 * u_glow;
-
     bars = 1.0 - exp(-bars * 1.4);
     col  = 1.0 - (1.0 - col) * (1.0 - bars);
 
