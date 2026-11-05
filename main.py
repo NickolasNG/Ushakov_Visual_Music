@@ -110,7 +110,7 @@ def main():
     tex_eye = None
     img_size = (1, 1)
     base_dir = os.path.dirname(os.path.abspath(__file__))
-    image_path = os.path.join(base_dir, "olhos_base_anime.png")
+    image_path = os.path.join(base_dir, "imagens", "olhos_base_anime.png")
     
     if os.path.exists(image_path):
         try:
