@@ -18,7 +18,7 @@ CONFIG_FILE = "config.json"
 # ================= SISTEMA DE SALVAMENTO =================
 def load_config():
     default_config = {
-        "theme_idx": 1,
+        "theme_idx": 2,
         "gain": 1.0,
         "smooth_factor": 0.12,
         "beat_threshold": 1.45,
@@ -47,18 +47,14 @@ def save_config(config):
 
 def apply_custom_theme():
     style = imgui.get_style()
-    
-    # 1. Carrega o tema escuro nativo do ImGui como uma base segura
     imgui.style_colors_dark(style)
     
-    # 2. Aplica os arredondamentos modernos (isso funciona nativamente)
     style.window_rounding = 0.0 
     style.frame_rounding = 6.0
     style.grab_rounding = 6.0
     style.popup_rounding = 6.0
     style.tab_rounding = 6.0
     
-    # 3. Usa o método específico do nanobind (set_color_) para pintar os botões
     try:
         style.set_color_(imgui.Col_.window_bg, imgui.ImVec4(0.10, 0.10, 0.12, 0.95))
         style.set_color_(imgui.Col_.frame_bg, imgui.ImVec4(0.15, 0.16, 0.19, 1.00))
@@ -75,8 +71,6 @@ def apply_custom_theme():
         style.set_color_(imgui.Col_.tab_hovered, imgui.ImVec4(0.25, 0.30, 0.50, 1.00))
         style.set_color_(imgui.Col_.tab_active, imgui.ImVec4(0.30, 0.35, 0.55, 1.00))
     except AttributeError:
-        # Se a versão for muito estrita e não possuir set_color_, 
-        # ele ignora o erro e mantém o tema dark nativo que já ativamos no passo 1.
         pass
 
 def main():
@@ -125,10 +119,8 @@ def main():
         except Exception as e:
             print(f"Erro ao carregar a imagem: {e}")
 
-    # Textos limpos sem acentos para evitar os "??" na interface
-    theme_names = ["Viagem Cosmica (Nebulosa)", "Equalizador Neon (64 Barras)", "Olho Anime (Milkdrop)"]
+    theme_names = ["Viagem Cosmica (Nebulosa)", "Equalizador Neon (64 Barras)", "Olho Anime + Barras Circulares"]
     
-    # Carrega as configurações salvas ou inicia com padrão
     config = load_config()
     current_theme_idx = config["theme_idx"]
     mask_center_x, mask_center_y, mask_radius = config["mask_x"], config["mask_y"], config["mask_radius"]
@@ -161,7 +153,6 @@ def main():
         glfw.poll_events()
         impl.process_inputs()
 
-        # Leitura limpa e exata da tecla H (sem conflito com interface)
         h_state = glfw.get_key(window, glfw.KEY_H)
         if h_state == glfw.PRESS and not h_was_pressed:
             show_ui = not show_ui
@@ -206,11 +197,9 @@ def main():
         ctx.clear(0.0, 0.0, 0.0, 1.0)
         active_vao.render(moderngl.TRIANGLE_STRIP)
 
-        # ---------------- Painel ImGui (Top NavBar) ----------------
         if show_ui:
             imgui.new_frame()
             
-            # Força o menu a grudar no topo e ocupar a largura da tela
             imgui.set_next_window_pos(imgui.ImVec2(0, 0))
             imgui.set_next_window_size(imgui.ImVec2(fb_width, -1))
             
@@ -237,7 +226,6 @@ def main():
 
             imgui.same_line()
             
-            # Botão de Salvar adicionado aqui!
             if imgui.button("Salvar Configuracoes"):
                 config["theme_idx"] = current_theme_idx
                 config["gain"] = audio.gain
@@ -265,14 +253,15 @@ def main():
                         if tex_eye is None:
                             imgui.text_colored(imgui.ImVec4(1.0, 0.2, 0.2, 1.0), "Imagem nao carregou!")
                         else:
-                            imgui.set_next_item_width(150)
-                            _, mask_center_x = imgui.slider_float("Centro X", mask_center_x, -2.0, 2.0, "%.2f")
+                            imgui.text("Posicionamento Preciso do Olho (Digite os valores):")
+                            imgui.set_next_item_width(160)
+                            _, mask_center_x = imgui.input_float("Centro X", mask_center_x, 0.01, 0.1, "%.3f")
                             imgui.same_line()
-                            imgui.set_next_item_width(150)
-                            _, mask_center_y = imgui.slider_float("Centro Y", mask_center_y, -1.0, 1.0, "%.2f")
+                            imgui.set_next_item_width(160)
+                            _, mask_center_y = imgui.input_float("Centro Y", mask_center_y, 0.01, 0.1, "%.3f")
                             imgui.same_line()
-                            imgui.set_next_item_width(150)
-                            _, mask_radius = imgui.slider_float("Tamanho", mask_radius, 0.1, 1.5, "%.2f")
+                            imgui.set_next_item_width(160)
+                            _, mask_radius = imgui.input_float("Tamanho", mask_radius, 0.01, 0.1, "%.3f")
                     imgui.end_tab_item()
 
                 # --- ABA 2: ÁUDIO ---

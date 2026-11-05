@@ -222,57 +222,73 @@ uniform float u_bands[64];
 uniform float u_beat;
 uniform float u_bass;
 
-// Controles da máscara que vêm do Python
 uniform vec2 u_mask_center;
 uniform float u_mask_radius;
 
 in vec2 v_uv;
 out vec4 fragColor;
 
+#define PI 3.14159265359
+
 void main() {
-    // Coordenadas normalizadas com correção de proporção 16:9
     vec2 p = v_uv * 2.0 - 1.0;
     p.x *= iResolution.x / iResolution.y;
 
-    // Distância do pixel até o centro do nosso "círculo" invisível
-    float d = length(p - u_mask_center);
-    
-    // Máscara (1.0 no centro da pupila, caindo suavemente para 0.0 na borda)
-    float mask = 1.0 - smoothstep(u_mask_radius * 0.5, u_mask_radius, d);
+    vec2 center_corrected = u_mask_center;
+    center_corrected.x *= iResolution.x / iResolution.y;
+
+    float d = length(p - center_corrected);
+    float mask = 1.0 - smoothstep(u_mask_radius * 0.7, u_mask_radius * 1.02, d);
 
     vec2 offset = vec2(0.0);
     
-    // Calcula as distorções apenas se estivermos dentro do olho vermelho
     if (mask > 0.001) {
-        // Efeito 1: O olho "pulsa" com as batidas graves
         float zoom = 1.0 - u_beat * 0.15;
-        
-        // Efeito 2: Rotação suave constante
         float theta = sin(iTime * 0.5) * 0.15 + u_beat * 0.2;
         mat2 rot = mat2(cos(theta), -sin(theta), sin(theta), cos(theta));
         
-        // Efeito 3: Micro-ondas líquidas usando as 64 bandas
         float ripple = 0.0;
         for (int i = 0; i < 8; i++) {
             float band_val = u_bands[i * 4]; 
             ripple += sin(d * (15.0 + float(i)*10.0) - iTime * (2.0 + float(i))) * band_val * 0.015;
         }
         
-        // Mistura a matemática para entortar a coordenada original
-        vec2 p_rot = rot * ((p - u_mask_center) * zoom) + u_mask_center;
+        vec2 p_rot = rot * ((p - center_corrected) * zoom) + center_corrected;
         offset = (p_rot - p); 
-        offset += normalize(p - u_mask_center + vec2(0.001)) * ripple; 
+        offset += normalize(p - center_corrected + vec2(0.001)) * ripple; 
     }
 
-    // A coordenada final de leitura da imagem: original + distorção * força da máscara
     vec2 final_uv = v_uv + (offset * mask * 0.5); 
-    
-    // Lê o JPG usando a coordenada distorcida
     vec4 col = texture(u_tex, final_uv);
 
-    // Opcional: faz o centro da pupila brilhar de vermelho com os graves
-    vec3 glow = vec3(1.0, 0.1, 0.2) * u_bass * 0.4 * mask;
+    vec3 glow = col.rgb * u_bass * 0.4 * mask;
     col.rgb += glow;
+
+    vec2 rel_p = p - center_corrected;
+    float current_angle = atan(rel_p.y, rel_p.x); 
+    if (current_angle < 0.0) current_angle += 2.0 * PI; 
+
+    float current_radius = length(rel_p);
+    float inner_radius = u_mask_radius * 0.95; 
+
+    if (current_radius > inner_radius && current_radius < inner_radius + 0.45) {
+        float angle_normalized = current_angle / (2.0 * PI);
+        int bar_index = int(mod(floor(angle_normalized * 64.0), 64.0));
+        
+        float bar_val = clamp(u_bands[bar_index], 0.0, 1.0);
+        float bar_max_radius = inner_radius + 0.02 + bar_val * 0.35;
+
+        if (current_radius < bar_max_radius) {
+            vec2 sample_pos = center_corrected + vec2(cos(current_angle), sin(current_angle)) * inner_radius;
+            sample_pos.x /= (iResolution.x / iResolution.y);
+            vec4 img_color = texture(u_tex, sample_pos * 0.5 + 0.5);
+
+            vec3 dynamic_color = img_color.rgb * 1.7 + vec3(0.1);
+            
+            float intensity = (0.8 + u_beat * 0.8) * (1.0 + bar_val * 2.0);
+            col.rgb += dynamic_color * intensity * 0.7;
+        }
+    }
 
     fragColor = col;
 }
